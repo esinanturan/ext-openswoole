@@ -354,7 +354,6 @@ bool php_openswoole_client_set(Socket *cli, zval *zset) {
 bool php_openswoole_socket_set_ssl(Socket *sock, zval *zset) {
     HashTable *vht = Z_ARRVAL_P(zset);
     zval *ztmp;
-    bool ret = true;
 
     if (php_openswoole_array_get_value(vht, "ssl_protocols", ztmp)) {
         zend_long v = zval_get_long(ztmp);
@@ -371,7 +370,7 @@ bool php_openswoole_socket_set_ssl(Socket *sock, zval *zset) {
             sock->get_ssl_context()->cert_file = str_v.to_std_string();
         } else {
             php_openswoole_fatal_error(E_WARNING, "ssl cert file[%s] not found", str_v.val());
-            ret = false;
+            return false;
         }
     }
     if (php_openswoole_array_get_value(vht, "ssl_key_file", ztmp)) {
@@ -380,7 +379,7 @@ bool php_openswoole_socket_set_ssl(Socket *sock, zval *zset) {
             sock->get_ssl_context()->key_file = str_v.to_std_string();
         } else {
             php_openswoole_fatal_error(E_WARNING, "ssl key file[%s] not found", str_v.val());
-            ret = false;
+            return false;
         }
     }
     if (!sock->get_ssl_context()->cert_file.empty() && sock->get_ssl_context()->key_file.empty()) {
@@ -417,10 +416,8 @@ bool php_openswoole_socket_set_ssl(Socket *sock, zval *zset) {
     if (php_openswoole_array_get_value(vht, "ssl_ciphers", ztmp)) {
         sock->get_ssl_context()->ciphers = zend::String(ztmp).to_std_string();
     }
-    if (!sock->ssl_check_context()) {
-        ret = false;
-    }
-    return ret;
+
+    return true;
 }
 #endif
 

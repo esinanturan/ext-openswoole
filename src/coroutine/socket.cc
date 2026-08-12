@@ -1149,7 +1149,10 @@ bool Socket::listen(int backlog) {
         return false;
     }
 #ifdef OSW_USE_OPENSSL
-    ssl_is_server = true;
+    if (ssl_is_enable() && !ssl_listen()) {
+        set_err(OSW_ERROR_SSL_CREATE_CONTEXT_FAILED);
+        return false;
+    }
 #endif
     return true;
 }
@@ -1183,10 +1186,7 @@ Socket *Socket::accept(double timeout) {
 }
 
 #ifdef OSW_USE_OPENSSL
-bool Socket::ssl_check_context() {
-    if (socket->ssl || (get_ssl_context() && get_ssl_context()->get_context())) {
-        return true;
-    }
+bool Socket::ssl_context_create() {
     if (socket->is_dgram()) {
 #ifdef OSW_SUPPORT_DTLS
         socket->dtls = 1;
@@ -1199,7 +1199,6 @@ bool Socket::ssl_check_context() {
     }
     ssl_context->http_v2 = http2;
     if (!ssl_context->create()) {
-        openswoole_warning("swSSL_get_context() error");
         return false;
     }
     socket->ssl_send_ = 1;
@@ -1226,6 +1225,14 @@ bool Socket::ssl_create(SSLContext *ssl_context) {
     return true;
 }
 
+bool Socket::ssl_listen() {
+    ssl_is_server = true;
+    if (ssl_context->context == nullptr && !ssl_context_create()) {
+        return false;
+    }
+    return true;
+}
+
 bool Socket::ssl_handshake() {
     if (ssl_handshaked) {
         return false;
@@ -1233,12 +1240,20 @@ bool Socket::ssl_handshake() {
     if (osw_unlikely(!is_available(OSW_EVENT_RDWR))) {
         return false;
     }
-    if (!ssl_check_context()) {
+    /**
+     * If the ssl_context is empty, it indicates that this socket was not a connection
+     * returned by a server socket accept, and a new ssl_context needs to be created.
+     */
+    if (ssl_context->context == nullptr && !ssl_context_create()) {
         return false;
     }
     if (!ssl_create(get_ssl_context())) {
         return false;
     }
+    /**
+     * The server will use ssl_accept to complete the SSL handshake,
+     * while the client will use ssl_connect.
+     */
     if (!ssl_is_server) {
         while (true) {
             if (socket->ssl_connect() < 0) {
