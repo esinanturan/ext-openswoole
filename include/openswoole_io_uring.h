@@ -19,7 +19,9 @@
 #ifdef HAVE_IO_URING
 #include <liburing.h>
 #include <sys/stat.h>
+#if defined(__linux__) && defined(__GLIBC__)
 #include <linux/stat.h>
+#endif
 
 namespace openswoole {
 
